@@ -23,6 +23,7 @@ class RepoPackage:
     repo_path: str
     package_name: str
     version: str
+    source: str = "lockfile"
     dependencies: List['RepoDependency'] = field(default_factory=list)
 
 
@@ -70,6 +71,54 @@ def parse_vulnerabilities(file_path: str, debug=False) -> Dict[str, Vulnerabilit
     del vulnerabilities["Package"]  # TODO: Denne burde aldri legges inn lul
 
     return vulnerabilities
+
+
+def get_packages_from_package_json(repo_path: str) -> List[RepoPackage]:
+    package_json_path = os.path.join(repo_path, "package.json")
+    try:
+        with open(package_json_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return []
+
+    packages: List[RepoPackage] = []
+    seen_names: set = set()
+    dep_fields = [
+        "dependencies",
+        "devDependencies",
+        "peerDependencies",
+        "optionalDependencies",
+        "bundledDependencies",
+        "bundleDependencies",  # alternate spelling npm accepts
+    ]
+
+    for field_name in dep_fields:
+        field_data = data.get(field_name)
+        if field_data is None:
+            continue
+        if isinstance(field_data, list):
+            # bundledDependencies can be a list of package name strings
+            for package_name in field_data:
+                if isinstance(package_name, str) and package_name not in seen_names:
+                    seen_names.add(package_name)
+                    packages.append(RepoPackage(
+                        repo_path=repo_path,
+                        package_name=package_name,
+                        version="",
+                        source="package.json"
+                    ))
+        elif isinstance(field_data, dict):
+            for package_name in field_data:
+                if package_name not in seen_names:
+                    seen_names.add(package_name)
+                    packages.append(RepoPackage(
+                        repo_path=repo_path,
+                        package_name=package_name,
+                        version="",
+                        source="package.json"
+                    ))
+
+    return packages
 
 
 # TODO: Burde bare prosesssere én lockfile av gangen
@@ -220,25 +269,29 @@ def get_packages_in_repo(repo_path: str) -> List[RepoPackage]:
     lock_files = find_package_lock_files(repo_path)
     if DEBUG:
         print(f"Lock files found in {repo_path}: {lock_files}")
+
+    packages: List[RepoPackage] = []
+
     match lock_files:
         case []:
             if DEBUG:
                 print(
                     f"No lock files found in {repo_path}. Skipping vulnerability check.")
-            return []
         case ["package-lock.json"]:
             if DEBUG:
                 print("NPM lock file found.")
-            return get_all_packages_in_repo_npm(lock_files)
+            packages = get_all_packages_in_repo_npm(lock_files)
         case ["yarn.lock"]:
             if DEBUG:
                 print("Yarn lock file found.")
-            return get_all_packages_in_repo_yarn(lock_files)
+            packages = get_all_packages_in_repo_yarn(lock_files)
         case _:
             if DEBUG:
                 print(
                     f"Unsupported lock file(s) found in {repo_path}: {lock_files}.")
-            return []
+
+    packages.extend(get_packages_from_package_json(repo_path))
+    return packages
 
 
 def _to_semver_parts(value: str) -> list[int] | None:
@@ -289,17 +342,21 @@ def find_vulnerabilities_in_repo(repo_path: str, vulnerabilities: Dict[str, Vuln
         return any(satisfies_caret_range(version, v) for v in vulnerability.versions)
 
     for package in packages_in_repo:
-        direct_hit = (
-            package.package_name in vulnerabilities
-            and is_version_vulnerable(package.version, vulnerabilities[package.package_name])
-        )
-
-        # Only use indirect hit if dependency is not already represented directly.
-        indirect_hit = any(
-            dep.dependency_name in vulnerabilities
-            and not has_direct_package(dep.dependency_name)
-            for dep in package.dependencies
-        )
+        if package.source == "package.json":
+            # Name-only match for package.json: version ranges can't be resolved
+            direct_hit = package.package_name in vulnerabilities
+            indirect_hit = False
+        else:
+            direct_hit = (
+                package.package_name in vulnerabilities
+                and is_version_vulnerable(package.version, vulnerabilities[package.package_name])
+            )
+            # Only use indirect hit if dependency is not already represented directly.
+            indirect_hit = any(
+                dep.dependency_name in vulnerabilities
+                and not has_direct_package(dep.dependency_name)
+                for dep in package.dependencies
+            )
 
         if direct_hit or indirect_hit:
             key = (package.package_name, package.version)
