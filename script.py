@@ -158,15 +158,16 @@ def get_packages_in_repo(repo_path: str) -> List[RepoPackage]:
             )
             packages.append(package)
 
-            for dependency_name, dependency_version in package_info.get("dependencies", {}).items():
-                package.dependencies.append(
-                    RepoDependency(
-                        repo_path=repo_path,
-                        dependency_name=dependency_name,
-                        version_range=dependency_version,
-                        parent_package=package
+            for dep_key in ("dependencies", "devDependencies"):
+                for dependency_name, dependency_version in package_info.get(dep_key, {}).items():
+                    package.dependencies.append(
+                        RepoDependency(
+                            repo_path=repo_path,
+                            dependency_name=dependency_name,
+                            version_range=dependency_version,
+                            parent_package=package
+                        )
                     )
-                )
 
         return packages
 
@@ -337,12 +338,19 @@ def find_vulnerabilities_in_repo(repo_path: str, vulnerabilities: Dict[str, Vuln
     def has_direct_package(dep_name: str) -> bool:
         return any(p.package_name == dep_name for p in packages_in_repo)
 
+    def is_version_vulnerable(version: str, vulnerability: Vulnerability) -> bool:
+        return any(satisfies_caret_range(version, v) for v in vulnerability.versions)
+
     for package in packages_in_repo:
-        direct_hit = package.package_name in vulnerabilities
+        direct_hit = (
+            package.package_name in vulnerabilities
+            and is_version_vulnerable(package.version, vulnerabilities[package.package_name])
+        )
 
         # Only use indirect hit if dependency is not already represented directly.
         indirect_hit = any(
             dep.dependency_name in vulnerabilities
+            and not has_direct_package(dep.dependency_name)
             for dep in package.dependencies
         )
 
