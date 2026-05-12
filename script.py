@@ -109,15 +109,16 @@ def get_packages_in_repo(repo_path: str) -> List[RepoPackage]:
             )
             packages.append(package)
 
-            for dependency_name, dependency_version in package_info.get("dependencies", {}).items():
-                package.dependencies.append(
-                    RepoDependency(
-                        repo_path=repo_path,
-                        dependency_name=dependency_name,
-                        version_range=dependency_version,
-                        parent_package=package
+            for dep_key in ("dependencies", "devDependencies"):
+                for dependency_name, dependency_version in package_info.get(dep_key, {}).items():
+                    package.dependencies.append(
+                        RepoDependency(
+                            repo_path=repo_path,
+                            dependency_name=dependency_name,
+                            version_range=dependency_version,
+                            parent_package=package
+                        )
                     )
-                )
 
         return packages
 
