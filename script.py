@@ -23,6 +23,7 @@ class RepoPackage:
     repo_path: str
     package_name: str
     version: str
+    source: str = "lockfile"
     dependencies: List['RepoDependency'] = field(default_factory=list)
 
 
