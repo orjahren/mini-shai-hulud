@@ -4,7 +4,7 @@ from script import find_vulnerabilities_in_repo, parse_vulnerabilities
 
 
 root_scan_path = os.path.expanduser("~/")
-DISCOVERED_FILES = ["package-lock.json", "yarn.lock", "pnpm-lock.yaml", "package.json"]
+DISCOVERED_FILES = ["package-lock.json", "yarn.lock", "package.json"]
 INGORED_PATHS = ["node_modules", "vendor", "dist", "build", "target"]
 
 DEBUG = False
