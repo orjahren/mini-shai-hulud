@@ -4,7 +4,7 @@ from script import find_vulnerabilities_in_repo, parse_vulnerabilities
 
 
 root_scan_path = os.path.expanduser("~/")
-DISCOVERED_FILES = ["package-lock.json", "yarn.lock", "package.json"]
+DISCOVERED_FILES = ["package-lock.json", "yarn.lock", "pnpm-lock.yaml", "package.json"]
 INGORED_PATHS = ["node_modules", "vendor", "dist", "build", "target"]
 
 DEBUG = False
@@ -54,14 +54,16 @@ if __name__ == "__main__":
         for k, vulns in all_results.items()
     }
 
-    # --- Lock file findings ---
+    # --- Output ---
     print("\n=== Scan complete ===")
     print(f"Total repos scanned: {len(all_results)}")
 
+    # Lock file findings
+    print("\n=== Lock file vulnerabilities ===")
     repos_with_lockfile_vulns = {k: v for k, v in lockfile_hits.items() if v}
     if repos_with_lockfile_vulns:
         print(
-            f"Lock file vulnerabilities found in {len(repos_with_lockfile_vulns)} repository(ies):")
+            f"Found in {len(repos_with_lockfile_vulns)} repository(ies):")
         for repo_dir, vulns in repos_with_lockfile_vulns.items():
             print(f"\n{repo_dir}:")
             for vuln in vulns:
@@ -69,7 +71,7 @@ if __name__ == "__main__":
     else:
         print("No lock file vulnerabilities found.")
 
-    # --- package.json findings ---
+    # package.json findings
     print("\n=== package.json matches ===")
     repos_with_pj_hits = {k: v for k, v in pj_hits.items() if v}
     if repos_with_pj_hits:
