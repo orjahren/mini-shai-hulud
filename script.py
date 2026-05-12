@@ -342,17 +342,21 @@ def find_vulnerabilities_in_repo(repo_path: str, vulnerabilities: Dict[str, Vuln
         return any(satisfies_caret_range(version, v) for v in vulnerability.versions)
 
     for package in packages_in_repo:
-        direct_hit = (
-            package.package_name in vulnerabilities
-            and is_version_vulnerable(package.version, vulnerabilities[package.package_name])
-        )
-
-        # Only use indirect hit if dependency is not already represented directly.
-        indirect_hit = any(
-            dep.dependency_name in vulnerabilities
-            and not has_direct_package(dep.dependency_name)
-            for dep in package.dependencies
-        )
+        if package.source == "package.json":
+            # Name-only match for package.json: version ranges can't be resolved
+            direct_hit = package.package_name in vulnerabilities
+            indirect_hit = False
+        else:
+            direct_hit = (
+                package.package_name in vulnerabilities
+                and is_version_vulnerable(package.version, vulnerabilities[package.package_name])
+            )
+            # Only use indirect hit if dependency is not already represented directly.
+            indirect_hit = any(
+                dep.dependency_name in vulnerabilities
+                and not has_direct_package(dep.dependency_name)
+                for dep in package.dependencies
+            )
 
         if direct_hit or indirect_hit:
             key = (package.package_name, package.version)

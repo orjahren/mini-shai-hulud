@@ -211,5 +211,80 @@ class TestPackageParsingAndVulnerabilities(unittest.TestCase):
             self.assertEqual(p.version, "")
 
 
+    def test_package_json_vulnerability_detection(self):
+        """
+        Test that a vulnerable package listed in package.json is flagged by name.
+        Version is not checked for package.json sources.
+        """
+        package_json_data = {
+            "dependencies": {"lodash": "^4.17.21"}
+        }
+        pj_path = os.path.join(self.TEST_DIR, "package.json")
+        with open(pj_path, "w", encoding="utf-8") as f:
+            json.dump(package_json_data, f)
+
+        report = find_vulnerabilities_in_repo(self.TEST_DIR, vulnerabilities_data)
+
+        self.assertEqual(len(report.vulnerabilities), 1)
+        self.assertEqual(report.vulnerabilities[0].package_name, "lodash")
+        self.assertEqual(report.vulnerabilities[0].source, "package.json")
+        self.assertEqual(report.vulnerabilities[0].version, "")
+
+    def test_package_json_no_false_positive(self):
+        """
+        Test that non-vulnerable packages in package.json produce an empty report.
+        """
+        package_json_data = {
+            "dependencies": {"axios": "^1.6.0"},
+            "devDependencies": {"typescript": "^5.0.0"}
+        }
+        pj_path = os.path.join(self.TEST_DIR, "package.json")
+        with open(pj_path, "w", encoding="utf-8") as f:
+            json.dump(package_json_data, f)
+
+        report = find_vulnerabilities_in_repo(self.TEST_DIR, vulnerabilities_data)
+
+        self.assertEqual(len(report.vulnerabilities), 0)
+
+    def test_repo_with_both_lockfile_and_package_json(self):
+        """
+        Test that a repo with both a lock file and a package.json reports
+        vulnerabilities from both sources independently.
+        """
+        # Lock file: lodash 4.17.21 (vulnerable by version)
+        npm_lock_data_local = {
+            "name": "test-project",
+            "version": "1.0.0",
+            "packages": {
+                "": {
+                    "name": "test-project",
+                    "version": "1.0.0",
+                    "dependencies": {"lodash": "^4.17.15"}
+                },
+                "node_modules/lodash": {"version": "4.17.21"}
+            }
+        }
+        npm_lock_path = os.path.join(self.TEST_DIR, "package-lock.json")
+        with open(npm_lock_path, "w", encoding="utf-8") as f:
+            json.dump(npm_lock_data_local, f, indent=2)
+
+        # package.json: lodash (vulnerable by name)
+        package_json_data = {"dependencies": {"lodash": "^4.17.21"}}
+        pj_path = os.path.join(self.TEST_DIR, "package.json")
+        with open(pj_path, "w", encoding="utf-8") as f:
+            json.dump(package_json_data, f)
+
+        packages = get_packages_in_repo(self.TEST_DIR)
+        lockfile_pkgs = [p for p in packages if p.source == "lockfile"]
+        pj_pkgs = [p for p in packages if p.source == "package.json"]
+        self.assertGreater(len(lockfile_pkgs), 0)
+        self.assertGreater(len(pj_pkgs), 0)
+
+        report = find_vulnerabilities_in_repo(self.TEST_DIR, vulnerabilities_data)
+        sources = {v.source for v in report.vulnerabilities}
+        self.assertIn("lockfile", sources)
+        self.assertIn("package.json", sources)
+
+
 if __name__ == "__main__":
     unittest.main()
