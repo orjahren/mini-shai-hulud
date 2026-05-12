@@ -3,7 +3,7 @@ import os
 from script import find_vulnerabilities_in_repo, parse_vulnerabilities
 
 
-root_scan_path = os.path.expanduser("~/Documents/")
+root_scan_path = os.path.expanduser("~/")
 SUPPORTED_LOCK_FILES = ["package-lock.json", "yarn.lock"]
 INGORED_PATHS = ["node_modules", "vendor", "dist", "build", "target"]
 
@@ -16,8 +16,12 @@ if __name__ == "__main__":
     print(f"Walking through {root_scan_path} to find lock files...")
 
     for root, dirs, files in os.walk(root_scan_path):
-        # Skip ignored paths
-        dirs[:] = [d for d in dirs if d not in INGORED_PATHS]
+        # Skip ignored paths and any folder containing 'onedrive' (case-insensitive)
+        dirs[:] = [
+            d for d in dirs
+            if d.lower() not in [p.lower() for p in INGORED_PATHS]
+            and "onedrive" not in d.lower()
+        ]
         if DEBUG:
             print(f"Scanning {root}...")
         for file in files:
