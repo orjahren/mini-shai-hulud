@@ -179,5 +179,37 @@ class TestPackageParsingAndVulnerabilities(unittest.TestCase):
         self.assertEqual(vulnerable_package.version, "4.17.21")
 
 
+    def test_package_json_parsing(self):
+        """
+        Test that get_packages_in_repo includes packages from all dependency fields
+        in package.json, tagged with source="package.json".
+        """
+        package_json_data = {
+            "name": "test-project",
+            "dependencies": {"lodash": "^4.17.21"},
+            "devDependencies": {"jest": "^29.0.0"},
+            "peerDependencies": {"react": ">=16"},
+            "optionalDependencies": {"fsevents": "^2.3.0"},
+            "bundledDependencies": ["some-bundled-pkg"]
+        }
+        pj_path = os.path.join(self.TEST_DIR, "package.json")
+        with open(pj_path, "w", encoding="utf-8") as f:
+            json.dump(package_json_data, f)
+
+        packages = get_packages_in_repo(self.TEST_DIR)
+        self.assertEqual(len(packages), 5)
+
+        names = {p.package_name for p in packages}
+        self.assertIn("lodash", names)
+        self.assertIn("jest", names)
+        self.assertIn("react", names)
+        self.assertIn("fsevents", names)
+        self.assertIn("some-bundled-pkg", names)
+
+        for p in packages:
+            self.assertEqual(p.source, "package.json")
+            self.assertEqual(p.version, "")
+
+
 if __name__ == "__main__":
     unittest.main()
