@@ -1,4 +1,5 @@
 import json
+import subprocess
 import os
 from dataclasses import dataclass, field
 from typing import Dict, List
@@ -85,6 +86,29 @@ def get_packages_in_repo(repo_path: str) -> List[RepoPackage]:
                 if DEBUG:
                     print(f"Found lock file: {file} in {repo_path}")
         return found_files
+
+    def get_all_packages_in_repo_pnpm(package_lock_files: List[str]) -> List[RepoPackage]:
+        packages: List[RepoPackage] = []
+
+        with open(os.path.join(repo_path, package_lock_files[0]), 'r', encoding='utf-8') as file:
+            process = subprocess.Popen(['yq', '-o=json', '.'], stdin=file, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            stdout, stderr = process.communicate()
+            if process.returncode == 0:
+                parsed_lock_file = json.loads(stdout)
+            else:
+                print(f"Error: {stderr}")
+
+        for package_path in parsed_lock_file.get("packages", {}).keys():
+            package_name, package_version = package_path.rsplit("@", 1)
+
+            package = RepoPackage(
+                repo_path=repo_path,
+                package_name=package_name,
+                version=package_version
+            )
+            packages.append(package)
+
+        return packages
 
     def get_all_packages_in_repo_npm(package_lock_files: List[str]) -> List[RepoPackage]:
         packages: List[RepoPackage] = []
@@ -226,6 +250,10 @@ def get_packages_in_repo(repo_path: str) -> List[RepoPackage]:
                 print(
                     f"No lock files found in {repo_path}. Skipping vulnerability check.")
             return []
+        case ["pnpm-lock.yaml"]:
+            if DEBUG:
+                print("PNPM lock file found.")
+            return get_all_packages_in_repo_pnpm(lock_files)
         case ["package-lock.json"]:
             if DEBUG:
                 print("NPM lock file found.")

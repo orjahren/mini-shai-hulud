@@ -4,7 +4,7 @@ import sys
 from script import find_vulnerabilities_in_repo, parse_vulnerabilities
 
 
-SUPPORTED_LOCK_FILES = ["package-lock.json", "yarn.lock"]
+SUPPORTED_LOCK_FILES = ["package-lock.json", "yarn.lock", "pnpm-lock.yaml"]
 INGORED_PATHS = ["node_modules", "vendor", "dist", "build", "target"]
 
 DEBUG = False
