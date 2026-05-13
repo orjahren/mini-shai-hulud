@@ -1,9 +1,9 @@
 import os
+import sys
 
 from script import find_vulnerabilities_in_repo, parse_vulnerabilities
 
 
-root_scan_path = os.path.expanduser("~/")
 SUPPORTED_LOCK_FILES = ["package-lock.json", "yarn.lock"]
 INGORED_PATHS = ["node_modules", "vendor", "dist", "build", "target"]
 
@@ -11,10 +11,22 @@ DEBUG = False
 
 if __name__ == "__main__":
     print("Scanning for vulnerabilities in repositories...")
-    lockfiles = []
+
+    # If specific paths are provided as arguments, use those instead of
+    # walking the home directory
+    if sys.argv[1:]:
+        root_scan_path = sys.argv[1]
+        if not os.path.exists(root_scan_path):
+            print(f"Error: Specified path '{root_scan_path}' does not exist.")
+            sys.exit(1)
+        print(f"Scanning specified path: {root_scan_path}")
+    else:
+        # Default to scanning the user's home directory
+        root_scan_path = os.path.expanduser("~")
 
     print(f"Walking through {root_scan_path} to find lock files...")
 
+    lockfiles = []
     for root, dirs, files in os.walk(root_scan_path):
         # Skip ignored paths and any folder containing 'onedrive' (case-insensitive)
         dirs[:] = [
