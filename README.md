@@ -14,3 +14,11 @@ mappe som blir sjekket. Som standard er det hele hjemmeområdet.
 Du kan også spesifisere rot-mappe for scanningen ved å legge ved et argument.
 
 `$ python pc-checker.py ../min-kode`
+
+## Støttede formater
+
+- `package-lock.json` (npm)
+- `yarn.lock` (Yarn v1)
+- `pnpm-lock.yaml` (pnpm) — krever PyYAML: `$ pip install pyyaml`
+
+Uten PyYAML vil `pnpm`-repoer bli hoppet over, mens npm og Yarn fungerer som normalt.
