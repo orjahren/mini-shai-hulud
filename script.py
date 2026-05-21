@@ -89,7 +89,8 @@ def get_packages_in_repo(repo_path: str) -> List[RepoPackage]:
 
     def get_all_packages_in_repo_pnpm(package_lock_files: List[str]) -> List[RepoPackage]:
         packages: List[RepoPackage] = []
-        parsed_lock_file = parse_yaml(os.path.join(repo_path, package_lock_files[0]))
+        parsed_lock_file = parse_yaml(
+            os.path.join(repo_path, package_lock_files[0]))
         for package_path in parsed_lock_file.get("packages", {}).keys():
             package_name, package_version = package_path.rsplit("@", 1)
 

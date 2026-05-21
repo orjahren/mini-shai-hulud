@@ -22,15 +22,17 @@ except ImportError:
 if DEBUG:
     print(f"Using YAML parser: {yaml_impl}")
 
+
 def parse_yaml(file_path):
     if yaml_impl is None:
-        raise RuntimeError("No YAML parser available. Please install PyYAML or yq(1).")
+        raise RuntimeError(
+            "No YAML parser available. Please install PyYAML or yq(1).")
     with open(file_path, 'r') as f:
         if yaml_impl == "PyYAML":
             return yaml.safe_load(f)
         elif yaml_impl in commands:
-            cp = run(commands[yaml_impl], stdin=f, text=True, capture_output=True)
+            cp = run(commands[yaml_impl], stdin=f,
+                     text=True, capture_output=True)
             if cp.returncode == 0:
                 return json.loads(cp.stdout)
             raise RuntimeError(f"Error parsing YAML with yq: {cp.stderr}")
-
