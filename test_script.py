@@ -3,6 +3,12 @@ import os
 import json
 from script import get_packages_in_repo, find_vulnerabilities_in_repo, Vulnerability, RepoVulnerabilityReport
 
+try:
+    import yaml
+    _yaml_available = True
+except ImportError:
+    _yaml_available = False
+
 # Mock NPM package-lock.json data
 npm_lock_data = {
     "name": "test-project",
@@ -177,6 +183,75 @@ class TestPackageParsingAndVulnerabilities(unittest.TestCase):
         vulnerable_package = report.vulnerabilities[0]
         self.assertEqual(vulnerable_package.package_name, "lodash")
         self.assertEqual(vulnerable_package.version, "4.17.21")
+
+
+# Mock pnpm-lock.yaml data (v6 format — packages keyed as name@version)
+pnpm_lock_data = """\
+lockfileVersion: '6.0'
+
+packages:
+
+  lodash@4.17.21:
+    resolution: {integrity: sha512-abc123}
+    dev: false
+
+  react@17.0.2:
+    resolution: {integrity: sha512-def456}
+    dev: false
+"""
+
+
+@unittest.skipUnless(_yaml_available, "PyYAML not installed")
+class TestPnpmParsing(unittest.TestCase):
+    TEST_DIR = "./test_repo_pnpm"
+
+    @classmethod
+    def setUpClass(cls):
+        os.makedirs(cls.TEST_DIR, exist_ok=True)
+
+    @classmethod
+    def tearDownClass(cls):
+        for file_name in os.listdir(cls.TEST_DIR):
+            os.remove(os.path.join(cls.TEST_DIR, file_name))
+        os.rmdir(cls.TEST_DIR)
+
+    def setUp(self):
+        for file_name in os.listdir(self.TEST_DIR):
+            os.remove(os.path.join(self.TEST_DIR, file_name))
+
+    def _write_lock(self):
+        with open(os.path.join(self.TEST_DIR, "pnpm-lock.yaml"), "w") as f:
+            f.write(pnpm_lock_data)
+
+    def test_pnpm_package_parsing(self):
+        self._write_lock()
+        packages = get_packages_in_repo(self.TEST_DIR)
+        self.assertEqual(len(packages), 2)
+
+        names = {p.package_name for p in packages}
+        self.assertIn("lodash", names)
+        self.assertIn("react", names)
+
+        lodash = next(p for p in packages if p.package_name == "lodash")
+        self.assertEqual(lodash.version, "4.17.21")
+
+        react = next(p for p in packages if p.package_name == "react")
+        self.assertEqual(react.version, "17.0.2")
+
+    def test_pnpm_vulnerability_detection(self):
+        self._write_lock()
+        report = find_vulnerabilities_in_repo(self.TEST_DIR, vulnerabilities_data)
+        self.assertEqual(len(report.vulnerabilities), 1)
+
+        vuln = report.vulnerabilities[0]
+        self.assertEqual(vuln.package_name, "lodash")
+        self.assertEqual(vuln.version, "4.17.21")
+
+    def test_pnpm_empty_packages_section(self):
+        with open(os.path.join(self.TEST_DIR, "pnpm-lock.yaml"), "w") as f:
+            f.write("lockfileVersion: '6.0'\n")
+        packages = get_packages_in_repo(self.TEST_DIR)
+        self.assertEqual(packages, [])
 
 
 if __name__ == "__main__":
