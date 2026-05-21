@@ -5,9 +5,14 @@ from script import find_vulnerabilities_in_repo, parse_vulnerabilities
 
 
 SUPPORTED_LOCK_FILES = ["package-lock.json", "yarn.lock"]
+try:
+    import yaml
+    SUPPORTED_LOCK_FILES.append("pnpm-lock.yaml")
+except ImportError:
+    pass
 INGORED_PATHS = ["node_modules", "vendor", "dist", "build", "target"]
 
-DEBUG = False
+DEBUG = os.environ.get("DEBUG", "") != ""
 
 if __name__ == "__main__":
     print("Scanning for vulnerabilities in repositories...")

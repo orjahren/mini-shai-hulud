@@ -3,7 +3,14 @@ import os
 from dataclasses import dataclass, field
 from typing import Dict, List
 
-DEBUG = False
+try:
+    import yaml as _yaml
+    _pnpm_supported = True
+except ImportError:
+    _yaml = None
+    _pnpm_supported = False
+
+DEBUG = os.environ.get("DEBUG", "") != ""
 
 
 @dataclass
@@ -74,7 +81,10 @@ def parse_vulnerabilities(file_path: str, debug=False) -> Dict[str, Vulnerabilit
 
 # TODO: Burde bare prosesssere én lockfile av gangen
 def get_packages_in_repo(repo_path: str) -> List[RepoPackage]:
-    def find_package_lock_files(repo_path: str, file_names=["package-lock.json", "yarn.lock", "pnpm-lock.yaml"]) -> List[str]:
+    def find_package_lock_files(repo_path: str) -> List[str]:
+        file_names = ["package-lock.json", "yarn.lock"]
+        if _pnpm_supported:
+            file_names.append("pnpm-lock.yaml")
         all_files = os.listdir(repo_path)  # TODO: Burde også sjekke submapper?
         found_files = []
         for file in all_files:
@@ -85,6 +95,22 @@ def get_packages_in_repo(repo_path: str) -> List[RepoPackage]:
                 if DEBUG:
                     print(f"Found lock file: {file} in {repo_path}")
         return found_files
+
+    def get_all_packages_in_repo_pnpm(package_lock_files: List[str]) -> List[RepoPackage]:
+        packages: List[RepoPackage] = []
+        with open(os.path.join(repo_path, package_lock_files[0]), 'r') as f:
+            parsed_lock_file = _yaml.safe_load(f)
+        for package_path in parsed_lock_file.get("packages", {}).keys():
+            package_name, package_version = package_path.rsplit("@", 1)
+
+            package = RepoPackage(
+                repo_path=repo_path,
+                package_name=package_name,
+                version=package_version
+            )
+            packages.append(package)
+
+        return packages
 
     def get_all_packages_in_repo_npm(package_lock_files: List[str]) -> List[RepoPackage]:
         packages: List[RepoPackage] = []
@@ -226,6 +252,10 @@ def get_packages_in_repo(repo_path: str) -> List[RepoPackage]:
                 print(
                     f"No lock files found in {repo_path}. Skipping vulnerability check.")
             return []
+        case ["pnpm-lock.yaml"]:
+            if DEBUG:
+                print("PNPM lock file found.")
+            return get_all_packages_in_repo_pnpm(lock_files)
         case ["package-lock.json"]:
             if DEBUG:
                 print("NPM lock file found.")
