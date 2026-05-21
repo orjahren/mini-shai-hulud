@@ -2,8 +2,6 @@ import json
 import os
 from dataclasses import dataclass, field
 from typing import Dict, List
-from custom_yaml import parse_yaml
-
 DEBUG = os.environ.get("DEBUG", "") != ""
 
 
@@ -88,9 +86,14 @@ def get_packages_in_repo(repo_path: str) -> List[RepoPackage]:
         return found_files
 
     def get_all_packages_in_repo_pnpm(package_lock_files: List[str]) -> List[RepoPackage]:
+        try:
+            import yaml
+        except ImportError:
+            print("Warning: PyYAML not installed. Skipping pnpm-lock.yaml. Install with: pip install pyyaml")
+            return []
         packages: List[RepoPackage] = []
-        parsed_lock_file = parse_yaml(
-            os.path.join(repo_path, package_lock_files[0]))
+        with open(os.path.join(repo_path, package_lock_files[0]), 'r') as f:
+            parsed_lock_file = yaml.safe_load(f)
         for package_path in parsed_lock_file.get("packages", {}).keys():
             package_name, package_version = package_path.rsplit("@", 1)
 
